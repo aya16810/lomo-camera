@@ -3,37 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>LOMO Web WebGL Cam</title>
+  <title>LOMO WebGL Cam</title>
   <style>
+    * { box-sizing: border-box; }
     body {
-      margin: 0; padding: 0; background: #000;
+      margin: 0; padding: 0; background: #121212;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      height: 100vh; overflow: hidden; color: #fff; font-family: sans-serif;
+      min-height: 100vh; overflow: hidden; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     .camera-container {
-      position: relative; width: 100vw; max-width: 480px; aspect-ratio: 3/4; background: #222;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5); overflow: hidden;
+      position: relative; width: 90vw; max-width: 420px; aspect-ratio: 3/4;
+      background: #000; border-radius: 12px; overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
     }
     #gl-canvas {
-      width: 100%; height: 100%; object-fit: cover;
+      width: 100%; height: 100%; object-fit: cover; display: block;
     }
     .controls {
-      margin-top: 20px; width: 90%; max-width: 400px;
-      display: flex; flex-direction: column; gap: 15px;
+      margin-top: 18px; width: 90vw; max-width: 420px;
+      display: flex; flex-direction: column; gap: 12px;
     }
     .slider-group {
       display: flex; align-items: center; justify-content: space-between;
     }
-    .slider-group label { width: 80px; font-size: 14px; color: #bbb;}
-    input[type=range] { flex-grow: 1; margin: 0 10px; cursor: pointer; }
+    .slider-group label { width: 50px; font-size: 14px; color: #bbb; }
+    input[type=range] { flex-grow: 1; margin: 0 10px; accent-color: #ff4444; }
     
     #snap-btn {
-      margin-top: 25px; width: 70px; height: 70px; border-radius: 50%;
-      border: 5px solid #fff; background: #ff4444; cursor: pointer;
-      box-shadow: 0 0 15px rgba(255, 68, 68, 0.5);
-      transition: all 0.2s ease;
+      margin-top: 20px; width: 68px; height: 68px; border-radius: 50%;
+      border: 4px solid #fff; background: #ff4444; cursor: pointer;
+      box-shadow: 0 0 12px rgba(255, 68, 68, 0.4);
+      transition: transform 0.1s ease;
     }
-    #snap-btn:active { transform: scale(0.9); box-shadow: 0 0 5px rgba(255, 68, 68, 0.8); }
+    #snap-btn:active { transform: scale(0.92); }
     #download-link { display: none; }
   </style>
 </head>
@@ -46,68 +48,59 @@
   <div class="controls">
     <div class="slider-group">
       <label for="vignetteSlider">暗角</label>
-      <input type="range" id="vignetteSlider" min="0" max="1" step="0.01" value="0.6">
+      <input type="range" id="vignetteSlider" min="0" max="1" step="0.01" value="0.65">
     </div>
     <div class="slider-group">
       <label for="noiseSlider">噪點</label>
-      <input type="range" id="noiseSlider" min="0" max="0.2" step="0.005" value="0.05">
+      <input type="range" id="noiseSlider" min="0" max="0.2" step="0.005" value="0.06">
     </div>
   </div>
 
   <button id="snap-btn"></button>
   <a id="download-link"></a>
 
-  <!-- 💡 WebGL Shaders 💡 -->
-  <!-- 1. Vertex Shader (簡單頂點處理) -->
+  <!-- Vertex Shader -->
   <script id="vs" type="x-shader/x-vertex">
-    attribute vartexPosition;
+    attribute vec2 a_position;
     attribute vec2 a_texCoord;
     varying vec2 v_texCoord;
     void main() {
-      gl_Position = vec4(vertexPosition, 1.0);
+      gl_Position = vec4(a_position, 0.0, 1.0);
       v_texCoord = a_texCoord;
     }
   </script>
 
-  <!-- 2. Fragment Shader (LOMO 核心渲染管線) -->
+  <!-- Fragment Shader -->
   <script id="fs" type="x-shader/x-fragment">
     precision mediump float;
     uniform sampler2D u_image;
     varying vec2 v_texCoord;
     
-    // 💡 可調整的參數 (Uniforms)
-    uniform float u_vignetteIntensity; // 暗角強度 (0-1)
-    uniform float u_noiseIntensity;    // 噪點強度 (0-1)
-    uniform float u_time;               // 時間種子 (用於動態噪點)
+    uniform float u_vignetteIntensity;
+    uniform float u_noiseIntensity;
+    uniform float u_time;
 
-    // 💡 偽隨機數生成函數
     float rand(vec2 co) {
-      return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+      return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
     }
 
     void main() {
-      // 1. 抓取原本的像素顏色
       vec4 color = texture2D(u_image, v_texCoord);
       
-      // 💡 2. 應用 LOMO 色調 (簡單的高對比與飽和度模擬)
-      // 高對比
+      // 1. LOMO 高對比度與飽和度
       color.rgb = (color.rgb - 0.5) * 1.35 + 0.5;
-      // 稍微偏藍色調 (交叉沖印效果)
-      color.b = color.b * 1.1;
+      color.b = color.b * 1.08;
 
-      // 💡 3. 計算暗角 (Vignette)
+      // 2. 暗角計算 (Vignette)
       vec2 center = vec2(0.5, 0.5);
       float dist = distance(v_texCoord, center);
-      // 暗角計算：使用 smoothstep 創造柔和的圓形漸變
-      float vignette = smoothstep(0.8, 0.5 - u_vignetteIntensity * 0.4, dist);
+      float vignette = smoothstep(0.85, 0.45 - u_vignetteIntensity * 0.35, dist);
       color.rgb *= vignette;
 
-      // 💡 4. 計算噪點 (Noise/Grain)
-      // 使用坐標和時間生成噪點值 (-0.5 ~ 0.5)
-      float noise = (rand(v_texCoord + u_time) - 0.5) * u_noiseIntensity;
+      // 3. 底片噪點 (Noise/Grain)
+      float noise = (rand(v_texCoord + fract(u_time)) - 0.5) * u_noiseIntensity;
       color.rgb += noise;
 
-      // 確保顏色值在合法範圍內 (0-1)
       gl_FragColor = vec4(clamp(color.rgb, 0.0, 1.0), color.a);
     }
   </script>
@@ -120,58 +113,64 @@
     const snapBtn = document.getElementById('snap-btn');
     const downloadLink = document.getElementById('download-link');
 
-    if (!gl) { alert("此瀏覽器不支持 WebGL，無法啟動高級濾鏡效果。"); }
+    if (!gl) {
+      alert("此裝置或瀏覽器不支援 WebGL");
+    }
 
-    // 💡 狀態變數
     let video = null;
     let program = null;
     let texture = null;
-    let animationFrameId = null;
+    let isRendering = false;
 
-    // 💡 初始化 WebGL 渲染管線
+    function createShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+
     function initWebGL() {
       const vsSource = document.getElementById('vs').text;
       const fsSource = document.getElementById('fs').text;
-
-      function createShader(gl, type, source) {
-        const shader = gl.createShader(type);
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-          console.error(gl.getShaderInfoLog(shader));
-          gl.deleteShader(shader);
-          return null;
-        }
-        return shader;
-      }
-
       const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
       const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
       program = gl.createProgram();
       gl.attachShader(program, vs);
       gl.attachShader(program, fs);
       gl.linkProgram(program);
       gl.useProgram(program);
 
-      // 設置頂點數據 (覆蓋全螢幕的矩形)
-      const buffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      // 頂點座標 (全螢幕矩形)
+      const positionBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        -1.0, -1.0,  1.0, -1.0, -1.0,  1.0,  1.0,  1.0,
+        -1.0, -1.0,
+         1.0, -1.0,
+        -1.0,  1.0,
+         1.0,  1.0,
       ]), gl.STATIC_DRAW);
-      const positionLoc = gl.getAttribLocation(program, "vertexPosition");
-      gl.enableVertexAttribArray(positionLoc);
-      gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-      // 設置紋理坐標
-      const texCoordBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+      // 紋理座標 (配合手機鏡頭做 Y 軸翻轉)
+      const texBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, texBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        0.0, 1.0,  1.0, 1.0,  0.0, 0.0,  1.0, 0.0, // 注意：Y軸反轉
+        0.0, 1.0,
+        1.0, 1.0,
+        0.0, 0.0,
+        1.0, 0.0,
       ]), gl.STATIC_DRAW);
-      const texCoordLoc = gl.getAttribLocation(program, "a_texCoord");
-      gl.enableVertexAttribArray(texCoordLoc);
-      gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
+      const texLoc = gl.getAttribLocation(program, "a_texCoord");
+      gl.enableVertexAttribArray(texLoc);
+      gl.vertexAttribPointer(texLoc, 2, gl.FLOAT, false, 0, 0);
 
       // 建立紋理
       texture = gl.createTexture();
@@ -182,58 +181,71 @@
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     }
 
-    // 💡 啟動相機
     async function startCamera() {
       video = document.createElement('video');
-      video.autoplay = true;
-      video.playsinline = true;
+      video.setAttribute('autoplay', '');
+      video.setAttribute('muted', '');
+      video.setAttribute('playsinline', '');
+      video.muted = true;
+      video.playsInline = true;
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1024 } },
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
           audio: false
         });
+
         video.srcObject = stream;
-        video.onloadedmetadata = () => {
-          // 💡 設置 Canvas 解析度為影片原始大小
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          gl.viewport(0, 0, canvas.width, canvas.height);
-          render();
+        await video.play();
+
+        const updateSize = () => {
+          if (video.videoWidth > 0 && video.videoHeight > 0) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            if (!isRendering) {
+              isRendering = true;
+              render();
+            }
+          }
         };
+
+        video.addEventListener('loadeddata', updateSize);
+        video.addEventListener('playing', updateSize);
+
       } catch (err) {
-        alert("無法讀取相機，請檢查 HTTPS 與權限。");
+        alert("相機開啟失敗: " + err.name + " (" + err.message + ")");
       }
     }
 
-    // 💡 主渲染循環
     function render() {
-      if (!video) return;
+      // 確保鏡頭畫面已有像素資料再寫入 GPU
+      if (video && video.readyState >= video.HAVE_CURRENT_DATA) {
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
 
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      // 💡 將 Video Frame 上傳到 GPU 紋理
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+        gl.uniform1f(gl.getUniformLocation(program, "u_vignetteIntensity"), parseFloat(vignetteSlider.value));
+        gl.uniform1f(gl.getUniformLocation(program, "u_noiseIntensity"), parseFloat(noiseSlider.value));
+        gl.uniform1f(gl.getUniformLocation(program, "u_time"), performance.now() / 1000.0);
 
-      // 💡 更新 Shader 的可調整參數 (Uniforms)
-      gl.uniform1f(gl.getUniformLocation(program, "u_vignetteIntensity"), vignetteSlider.value);
-      gl.uniform1f(gl.getUniformLocation(program, "u_noiseIntensity"), noiseSlider.value);
-      gl.uniform1f(gl.getUniformLocation(program, "u_time"), performance.now() / 1000); // 動態噪點
-
-      // 繪製
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      animationFrameId = requestAnimationFrame(render);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      }
+      requestAnimationFrame(render);
     }
 
-    // 💡 拍照 (直接讀取 WebGL Canvas)
     snapBtn.addEventListener('click', () => {
-      // 確保最後一幀已渲染完成
-      render();
+      if (!isRendering) return;
+      // 產生高畫質 JPEG 圖片並下載
       const dataURL = canvas.toDataURL('image/jpeg', 0.95);
       downloadLink.href = dataURL;
-      downloadLink.download = `lomo_webgl_${Date.now()}.jpg`;
+      downloadLink.download = `lomo_${Date.now()}.jpg`;
       downloadLink.click();
     });
 
-    // 初始化並執行
     initWebGL();
     startCamera();
   </script>
