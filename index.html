@@ -34,8 +34,8 @@
     }
 
     .controls {
-      margin-top: 12px; width: 88vw; max-width: 380px;
-      display: flex; flex-direction: column; gap: 8px;
+      margin-top: 10px; width: 88vw; max-width: 380px;
+      display: flex; flex-direction: column; gap: 7px;
     }
     .preset-bar {
       display: flex; justify-content: space-between; gap: 6px;
@@ -48,27 +48,32 @@
       background: #ff5533; border-color: #ff5533; color: #fff; font-weight: bold;
     }
 
-    /* 實體膠囊開關樣式 */
     .toggles-bar {
       display: flex; gap: 8px; justify-content: space-between;
     }
     .toggle-btn {
-      flex: 1; padding: 7px 0; font-size: 12px; border-radius: 20px;
+      flex: 1; padding: 6px 0; font-size: 12px; border-radius: 20px;
       border: 1px solid #444; background: #222; color: #777;
       cursor: pointer; transition: all 0.2s ease;
     }
     .toggle-btn.active {
       background: #ff8800; border-color: #ff8800; color: #121212; font-weight: bold;
     }
+    .dice-btn {
+      padding: 6px 12px; font-size: 12px; border-radius: 20px;
+      border: 1px solid #555; background: #2a2a2a; color: #ddd;
+      cursor: pointer;
+    }
+    .dice-btn:active { background: #444; }
 
     .slider-group {
       display: flex; align-items: center; justify-content: space-between;
     }
-    .slider-group label { width: 36px; font-size: 12px; color: #888; }
+    .slider-group label { width: 50px; font-size: 12px; color: #888; }
     input[type=range] { flex-grow: 1; margin: 0 8px; accent-color: #ff5533; }
 
     #snap-btn {
-      margin-top: 14px; width: 68px; height: 68px; border-radius: 50%;
+      margin-top: 12px; width: 66px; height: 66px; border-radius: 50%;
       border: 4px solid #fff; background: #ff4444; cursor: pointer;
       box-shadow: 0 0 16px rgba(255, 68, 68, 0.4);
       transition: transform 0.08s ease;
@@ -95,13 +100,18 @@
       <button class="preset-btn" data-filter="noir">硬調黑白</button>
     </div>
 
-    <!-- 獨立切換開關 -->
+    <!-- 開關與隨機切換 -->
     <div class="toggles-bar">
       <button id="stampToggle" class="toggle-btn active">📅 日期戳：ON</button>
-      <button id="leakToggle" class="toggle-btn active">✨ 邊緣漏光：ON</button>
+      <button id="leakToggle" class="toggle-btn active">✨ 漏光：ON</button>
+      <button id="diceBtn" class="dice-btn">🎲 換樣式</button>
     </div>
 
     <!-- 數值微調 -->
+    <div class="slider-group">
+      <label>漏光強度</label>
+      <input type="range" id="leakIntensitySlider" min="0" max="1" step="0.02" value="0.75">
+    </div>
     <div class="slider-group">
       <label>暗角</label>
       <input type="range" id="vignetteSlider" min="0" max="1" step="0.02" value="0.65">
@@ -122,8 +132,10 @@
     const flashEl = document.getElementById('shutter-flash');
     const vignetteSlider = document.getElementById('vignetteSlider');
     const noiseSlider = document.getElementById('noiseSlider');
+    const leakIntensitySlider = document.getElementById('leakIntensitySlider');
     const stampToggle = document.getElementById('stampToggle');
     const leakToggle = document.getElementById('leakToggle');
+    const diceBtn = document.getElementById('diceBtn');
     const snapBtn = document.getElementById('snap-btn');
     const presetBtns = document.querySelectorAll('.preset-btn');
 
@@ -135,7 +147,6 @@
       noir: 'grayscale(100%) contrast(165%) brightness(90%)'
     };
 
-    // 風格選擇切換
     presetBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         presetBtns.forEach(b => b.classList.remove('active'));
@@ -144,7 +155,6 @@
       });
     });
 
-    // 開關狀態管理
     let isDateStampOn = true;
     let isLeakOn = true;
 
@@ -157,10 +167,52 @@
     leakToggle.addEventListener('click', () => {
       isLeakOn = !isLeakOn;
       leakToggle.classList.toggle('active', isLeakOn);
-      leakToggle.innerText = isLeakOn ? "✨ 邊緣漏光：ON" : "✨ 邊緣漏光：OFF";
+      leakToggle.innerText = isLeakOn ? "✨ 漏光：ON" : "✨ 漏光：OFF";
     });
 
-    // Web Audio 機械快門聲
+    // 💡 隨機生成漏光參數（每次打開頁面生成一次，不因快門改變）
+    let currentLeakConfig = generateRandomLeak();
+
+    function generateRandomLeak() {
+      const posType = Math.floor(Math.random() * 3); // 0: 左, 1: 右, 2: 頂部
+      let relX = 0, relY = 0;
+      if (posType === 0) {
+        relX = 0;
+        relY = 0.2 + Math.random() * 0.6;
+      } else if (posType === 1) {
+        relX = 1;
+        relY = 0.2 + Math.random() * 0.6;
+      } else {
+        relX = 0.2 + Math.random() * 0.6;
+        relY = 0;
+      }
+
+      const colorType = Math.floor(Math.random() * 3);
+      let rgb1, rgb2;
+      if (colorType === 0) { // 暖橙紅
+        rgb1 = [255, 50, 0];
+        rgb2 = [255, 140, 0];
+      } else if (colorType === 1) { // 洋紅紫
+        rgb1 = [255, 0, 110];
+        rgb2 = [180, 0, 255];
+      } else { // 金黃暖色
+        rgb1 = [255, 170, 0];
+        rgb2 = [255, 80, 0];
+      }
+
+      return {
+        relX, relY,
+        radiusScale: 0.65 + Math.random() * 0.3,
+        rgb1, rgb2
+      };
+    }
+
+    // 點擊骰子手動更換一組漏光樣式
+    diceBtn.addEventListener('click', () => {
+      currentLeakConfig = generateRandomLeak();
+    });
+
+    // Web Audio 機械快門音
     let audioCtx = null;
     function playShutterSound() {
       try {
@@ -180,7 +232,7 @@
       } catch (e) {}
     }
 
-    // 噪點快取圖層
+    // 噪點圖層快取
     const noiseCanvas = document.createElement('canvas');
     const noiseCtx = noiseCanvas.getContext('2d');
     noiseCanvas.width = 128;
@@ -200,7 +252,6 @@
       noiseCtx.putImageData(imgData, 0, 0);
     }
 
-    // 90 年代底片日期格式 ('26 09 03)
     function getStampDate() {
       const now = new Date();
       const yy = String(now.getFullYear()).slice(-2);
@@ -236,17 +287,24 @@
       const w = canvas.width;
       const h = canvas.height;
 
-      // 1. 畫面與風格
+      // 1. 影像與濾鏡
       ctx.filter = filters[currentPreset];
       ctx.drawImage(video, 0, 0, w, h);
       ctx.filter = 'none';
 
-      // 2. 邊緣漏光 (依按鈕狀態判斷)
-      if (isLeakOn) {
-        const leakGrad = ctx.createRadialGradient(0, h * 0.4, 10, 0, h * 0.4, w * 0.65);
-        leakGrad.addColorStop(0, 'rgba(255, 60, 0, 0.45)');
-        leakGrad.addColorStop(0.5, 'rgba(255, 160, 0, 0.25)');
-        leakGrad.addColorStop(1, 'rgba(255, 0, 100, 0)');
+      // 2. 隨機漏光 (位置固定，強度可手動滑動調節)
+      const leakIntensity = parseFloat(leakIntensitySlider.value);
+      if (isLeakOn && leakIntensity > 0) {
+        const { relX, relY, radiusScale, rgb1, rgb2 } = currentLeakConfig;
+        const x = w * relX;
+        const y = h * relY;
+        const r = Math.max(w, h) * radiusScale;
+
+        const leakGrad = ctx.createRadialGradient(x, y, 10, x, y, r);
+        leakGrad.addColorStop(0, `rgba(${rgb1[0]}, ${rgb1[1]}, ${rgb1[2]}, ${0.55 * leakIntensity})`);
+        leakGrad.addColorStop(0.45, `rgba(${rgb2[0]}, ${rgb2[1]}, ${rgb2[2]}, ${0.28 * leakIntensity})`);
+        leakGrad.addColorStop(1, 'rgba(0,0,0,0)');
+
         ctx.fillStyle = leakGrad;
         ctx.fillRect(0, 0, w, h);
       }
@@ -270,7 +328,7 @@
         ctx.fillRect(0, 0, w, h);
       }
 
-      // 5. 橘色日期戳印 (依按鈕狀態判斷)
+      // 5. 橘色底片日期戳印
       if (isDateStampOn) {
         const fontSize = Math.floor(w * 0.042);
         ctx.font = `bold ${fontSize}px "Courier New", Courier, monospace`;
@@ -287,7 +345,7 @@
       requestAnimationFrame(drawFrame);
     }
 
-    // 快門事件
+    // 快門事件（僅下載，不重新隨機化漏光）
     snapBtn.addEventListener('click', () => {
       playShutterSound();
       
