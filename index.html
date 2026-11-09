@@ -2,23 +2,42 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>LOMO Cam Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>LOMO Cam</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#121212">
+  <meta name="theme-color" content="#000000">
   <style>
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body {
-      margin: 0; padding: 0; background: #121212;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      min-height: 100vh; overflow: hidden; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
     }
-    #debug-log { font-size: 11px; color: #777; margin-bottom: 6px; }
-    
+    body {
+      margin: 0; padding: 0; background: #000;
+      display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+      height: 100vh; height: 100dvh;
+      overflow: hidden; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    #debug-log {
+      font-size: 11px; color: #666; height: 18px; line-height: 18px;
+      margin-top: 4px; text-align: center; transition: opacity 0.5s;
+    }
+
+    /* 觀景窗：自適應長螢幕與高解析度螢幕 */
     .camera-container {
-      position: relative; width: 88vw; max-width: 380px; aspect-ratio: 3/4;
-      background: #000; border-radius: 14px; overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+      position: relative;
+      width: 92vw;
+      max-width: 440px;
+      aspect-ratio: 3/4;
+      max-height: 58vh;
+      background: #111;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.8);
+      cursor: pointer;
     }
     #webcam {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -33,66 +52,76 @@
       background: #fff; opacity: 0; pointer-events: none; transition: opacity 0.08s ease;
     }
 
+    /* 控制面板區 */
     .controls {
-      margin-top: 10px; width: 88vw; max-width: 380px;
-      display: flex; flex-direction: column; gap: 7px;
+      width: 92vw;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 6px;
     }
     .preset-bar {
       display: flex; justify-content: space-between; gap: 6px;
     }
     .preset-btn {
-      flex: 1; padding: 6px 0; background: #262626; border: 1px solid #444;
-      border-radius: 6px; color: #ccc; font-size: 12px; cursor: pointer;
+      flex: 1; padding: 7px 0; background: #1c1c1e; border: 1px solid #333;
+      border-radius: 8px; color: #aaa; font-size: 12px; cursor: pointer;
     }
     .preset-btn.active {
       background: #ff5533; border-color: #ff5533; color: #fff; font-weight: bold;
     }
 
     .toggles-bar {
-      display: flex; gap: 8px; justify-content: space-between;
+      display: flex; gap: 6px; justify-content: space-between;
     }
     .toggle-btn {
-      flex: 1; padding: 6px 0; font-size: 12px; border-radius: 20px;
-      border: 1px solid #444; background: #222; color: #777;
+      flex: 1; padding: 6px 0; font-size: 11px; border-radius: 20px;
+      border: 1px solid #333; background: #1c1c1e; color: #666;
       cursor: pointer; transition: all 0.2s ease;
     }
     .toggle-btn.active {
-      background: #ff8800; border-color: #ff8800; color: #121212; font-weight: bold;
+      background: #ff8800; border-color: #ff8800; color: #000; font-weight: bold;
     }
     .dice-btn {
-      padding: 6px 12px; font-size: 12px; border-radius: 20px;
-      border: 1px solid #555; background: #2a2a2a; color: #ddd;
+      padding: 6px 10px; font-size: 11px; border-radius: 20px;
+      border: 1px solid #444; background: #2a2a2c; color: #eee;
       cursor: pointer;
     }
-    .dice-btn:active { background: #444; }
 
     .slider-group {
       display: flex; align-items: center; justify-content: space-between;
     }
-    .slider-group label { width: 50px; font-size: 12px; color: #888; }
-    input[type=range] { flex-grow: 1; margin: 0 8px; accent-color: #ff5533; }
+    .slider-group label { width: 52px; font-size: 11px; color: #777; }
+    input[type=range] { flex-grow: 1; margin: 0 8px; accent-color: #ff5533; height: 4px; }
 
+    /* 底部快門欄位 */
+    .bottom-bar {
+      width: 100%; display: flex; justify-content: center; align-items: center;
+      padding-bottom: env(safe-area-inset-bottom, 16px);
+      margin-bottom: 8px;
+    }
     #snap-btn {
-      margin-top: 12px; width: 66px; height: 66px; border-radius: 50%;
+      width: 68px; height: 68px; border-radius: 50%;
       border: 4px solid #fff; background: #ff4444; cursor: pointer;
-      box-shadow: 0 0 16px rgba(255, 68, 68, 0.4);
+      box-shadow: 0 0 16px rgba(255, 68, 68, 0.35);
       transition: transform 0.08s ease;
     }
-    #snap-btn:active { transform: scale(0.92); }
+    #snap-btn:active { transform: scale(0.9); }
   </style>
 </head>
 <body>
 
   <div id="debug-log">準備就緒</div>
 
-  <div class="camera-container">
+  <!-- 點擊觀景窗也可觸發拍照 -->
+  <div class="camera-container" id="viewfinder">
     <video id="webcam" autoplay playsinline muted></video>
     <canvas id="render-canvas"></canvas>
     <div id="shutter-flash"></div>
   </div>
 
   <div class="controls">
-    <!-- 風格預設 -->
     <div class="preset-bar">
       <button class="preset-btn active" data-filter="classic">經典</button>
       <button class="preset-btn" data-filter="cross">冷調沖印</button>
@@ -100,29 +129,29 @@
       <button class="preset-btn" data-filter="noir">硬調黑白</button>
     </div>
 
-    <!-- 開關與隨機切換 -->
     <div class="toggles-bar">
       <button id="stampToggle" class="toggle-btn active">📅 日期戳：ON</button>
       <button id="leakToggle" class="toggle-btn active">✨ 漏光：ON</button>
       <button id="diceBtn" class="dice-btn">🎲 換樣式</button>
     </div>
 
-    <!-- 數值微調 -->
     <div class="slider-group">
       <label>漏光強度</label>
       <input type="range" id="leakIntensitySlider" min="0" max="1" step="0.02" value="0.75">
     </div>
     <div class="slider-group">
-      <label>暗角</label>
+      <label>暗角強度</label>
       <input type="range" id="vignetteSlider" min="0" max="1" step="0.02" value="0.65">
     </div>
     <div class="slider-group">
-      <label>噪點</label>
+      <label>底片噪點</label>
       <input type="range" id="noiseSlider" min="0" max="60" step="1" value="22">
     </div>
   </div>
 
-  <button id="snap-btn"></button>
+  <div class="bottom-bar">
+    <button id="snap-btn"></button>
+  </div>
 
   <script>
     const logEl = document.getElementById('debug-log');
@@ -130,6 +159,7 @@
     const canvas = document.getElementById('render-canvas');
     const ctx = canvas.getContext('2d');
     const flashEl = document.getElementById('shutter-flash');
+    const viewfinder = document.getElementById('viewfinder');
     const vignetteSlider = document.getElementById('vignetteSlider');
     const noiseSlider = document.getElementById('noiseSlider');
     const leakIntensitySlider = document.getElementById('leakIntensitySlider');
@@ -170,11 +200,10 @@
       leakToggle.innerText = isLeakOn ? "✨ 漏光：ON" : "✨ 漏光：OFF";
     });
 
-    // 💡 隨機生成漏光參數（每次打開頁面生成一次，不因快門改變）
     let currentLeakConfig = generateRandomLeak();
 
     function generateRandomLeak() {
-      const posType = Math.floor(Math.random() * 3); // 0: 左, 1: 右, 2: 頂部
+      const posType = Math.floor(Math.random() * 3);
       let relX = 0, relY = 0;
       if (posType === 0) {
         relX = 0;
@@ -189,30 +218,25 @@
 
       const colorType = Math.floor(Math.random() * 3);
       let rgb1, rgb2;
-      if (colorType === 0) { // 暖橙紅
+      if (colorType === 0) {
         rgb1 = [255, 50, 0];
         rgb2 = [255, 140, 0];
-      } else if (colorType === 1) { // 洋紅紫
+      } else if (colorType === 1) {
         rgb1 = [255, 0, 110];
         rgb2 = [180, 0, 255];
-      } else { // 金黃暖色
+      } else {
         rgb1 = [255, 170, 0];
         rgb2 = [255, 80, 0];
       }
 
-      return {
-        relX, relY,
-        radiusScale: 0.65 + Math.random() * 0.3,
-        rgb1, rgb2
-      };
+      return { relX, relY, radiusScale: 0.65 + Math.random() * 0.3, rgb1, rgb2 };
     }
 
-    // 點擊骰子手動更換一組漏光樣式
     diceBtn.addEventListener('click', () => {
       currentLeakConfig = generateRandomLeak();
     });
 
-    // Web Audio 機械快門音
+    // 機械快門聲
     let audioCtx = null;
     function playShutterSound() {
       try {
@@ -232,7 +256,6 @@
       } catch (e) {}
     }
 
-    // 噪點圖層快取
     const noiseCanvas = document.createElement('canvas');
     const noiseCtx = noiseCanvas.getContext('2d');
     noiseCanvas.width = 128;
@@ -268,13 +291,15 @@
         });
         video.srcObject = stream;
         video.onplaying = () => {
-          logEl.innerText = "相機運作中";
+          logEl.innerText = "";
+          logEl.style.opacity = '0'; // 就緒後淡出日誌
           canvas.width = video.videoWidth || 640;
           canvas.height = video.videoHeight || 480;
           drawFrame();
         };
       } catch (err) {
-        logEl.innerText = "開啟失敗: " + err.message;
+        logEl.style.opacity = '1';
+        logEl.innerText = "相機啟動失敗: " + err.message;
       }
     }
 
@@ -287,12 +312,12 @@
       const w = canvas.width;
       const h = canvas.height;
 
-      // 1. 影像與濾鏡
+      // 1. 濾鏡畫面
       ctx.filter = filters[currentPreset];
       ctx.drawImage(video, 0, 0, w, h);
       ctx.filter = 'none';
 
-      // 2. 隨機漏光 (位置固定，強度可手動滑動調節)
+      // 2. 漏光
       const leakIntensity = parseFloat(leakIntensitySlider.value);
       if (isLeakOn && leakIntensity > 0) {
         const { relX, relY, radiusScale, rgb1, rgb2 } = currentLeakConfig;
@@ -328,7 +353,7 @@
         ctx.fillRect(0, 0, w, h);
       }
 
-      // 5. 橘色底片日期戳印
+      // 5. 日期戳
       if (isDateStampOn) {
         const fontSize = Math.floor(w * 0.042);
         ctx.font = `bold ${fontSize}px "Courier New", Courier, monospace`;
@@ -345,10 +370,9 @@
       requestAnimationFrame(drawFrame);
     }
 
-    // 快門事件（僅下載，不重新隨機化漏光）
-    snapBtn.addEventListener('click', () => {
+    // 拍照執行
+    function takePhoto() {
       playShutterSound();
-      
       flashEl.style.opacity = '0.85';
       setTimeout(() => { flashEl.style.opacity = '0'; }, 80);
 
@@ -356,7 +380,11 @@
       link.download = `LOMO_${Date.now()}.jpg`;
       link.href = canvas.toDataURL('image/jpeg', 0.95);
       link.click();
-    });
+    }
+
+    // 快門按鈕與點擊觀景窗拍照
+    snapBtn.addEventListener('click', takePhoto);
+    viewfinder.addEventListener('click', takePhoto);
 
     startCamera();
   </script>
